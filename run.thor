@@ -1,11 +1,10 @@
 require 'bundler/setup'
 require "anemone"
-require 'csv'
+require 'yaml'
 
 class Deadlink < Thor
   desc "Uri for the website", "an example task"
   def stalk(url)
-    @line_seprator = "\n"
     @dead_links = []
     begin
       @uri = URI.parse(url =~ /\Ahttp.*/ ? url : "http://#{url}")
@@ -25,8 +24,19 @@ class Deadlink < Thor
         @dead_links << page.url.to_s if page.code == 404
       end
 
-      anemone.after_crawl do |page|
-        STDOUT << @dead_links.to_csv(col_sep: @line_seprator)
+      anemone.after_crawl do |pages|
+        output = {}
+        unless @dead_links.empty?
+          missing_links = pages.urls_linking_to(@dead_links)
+          missing_links.each do |url, links|
+            encoded_url = CGI.escape(url.to_s)
+            output[encoded_url] ||= []
+            links.each do |u|
+              output[encoded_url] << CGI.escape(u.to_s)
+            end
+          end
+        end
+        puts output.to_yaml
       end
     end
   end
